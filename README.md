@@ -8,43 +8,50 @@
 
 ## Objetivo
 
-Identificar rapidamente **problemas de manutenção** em um repositório ao destacar **arquivos “hotspots”**: partes do código que mudam muito, são complexas e/ou dependem de um número pequeno de autores. Esses pontos tendem a acumular dívidas técnicas, bugs e custos de evolução.
+Destacar arquivos “hotspots” que tendem a gerar custo de manutenção por reunirem **muita mudança**, **alta complexidade** e/ou **concentração de conhecimento** (poucos autores). Isso orienta refatorações, testes e disseminação de conhecimento na equipe.
 
-## Como funciona
+### Como funciona
 
-1. **Coleta (Git local)**
-   Lemos o histórico do repositório com *PyDriller* para calcular métricas em um intervalo (ex.: últimos 90 dias, ou `--since <data>`).
-   Extraímos dados como **autores por arquivo** e contagem de commits por autor/arquivo.
+1. **Coleta (Git)**
+
+   * Percorremos o histórico do repositório com uma lib Git em Rust para obter, por arquivo, **linhas adicionadas/removidas** (churn) e **autores** ao longo de um período (`--since/--until`). Usaremos o **gix (gitoxide)** como backbone Git em Rust, que fornece abstração de `Repository` com foco em performance. ([Docs.rs][1])
+   * (Talvez) Possamos aceitar uma URL e clonar/localizar branch/tag. A ideia é fazer com o git local.
 
 2. **Complexidade**
-   Rodamos o *lizard* nos arquivos do código-fonte (ex.: `src/`, `app/`) para obter **complexidade ciclomática** (média e máximo por arquivo) e tamanho (LOC).
+
+   * Rodamos **rust-code-analysis** para extrair **métricas de manutenção** baseadas em **tree-sitter** (ex.: complexidade ciclomática por arquivo). É multilinguagem e projetado justamente para análise de código. ([mozilla.github.io][2])
 
 3. **Cálculo do Score de Risco**
-   Normalizamos os sinais e calculamos um score simples:
 
-   * `churn_norm` = churn do arquivo normalizado (0–1)
-   * `complex_norm` = complexidade máxima normalizada (0–1)
-   * `authorship_penalty` = `1 / (1 + log1p(n_autores))`  (menos autores ⇒ penalidade maior)
-   * **Score** = `100 * churn_norm * complex_norm * authorship_penalty`
-     Quanto maior, **mais crítico**.
+   * Normalizamos cada sinal em 0–1 e combinamos:
+
+     * `churn_norm` = churn do arquivo normalizado
+     * `complex_norm` = complexidade máxima normalizada
+     * `authorship_penalty` = `1 / (1 + log1p(n_autores))`  *(menos autores ⇒ penalidade maior)*
+     * **Score** = `100 * churn_norm * complex_norm * authorship_penalty`
+   * Quanto maior o score, **mais crítico**.
 
 4. **Saída**
-   * **Tabela no terminal** com Top N hotspots (arquivo, churn, complexidade, nº de autores, score).
-   * **Exportação opcional** (`--out report.md` | `--csv` | `--json`) para usar em relatórios/CI.
 
----
+   * **Tabela** no terminal (Top N com: caminho, churn, complexidade, nº de autores, score).
+   * **Exportação** via `--json`, `--csv` e `--out report.md`.
+   * **Filtros**: período (`--since`, `--until`), inclusão/exclusão de caminhos (`--include`, `--exclude`), `--top`.
+
+
 
 # Explicação das ferramentas utilizadas
 
-* **Rust**
-  Usado para **mineração de repositórios Git**. Facilita percorrer commits, arquivos alterados e metadados (autor, data, linhas adicionadas/removidas). É a base do nosso **cálculo de churn** e **autoria por arquivo**.
+* Linguagem: **Rust**
 
-* **Clap**
-  Ferramenta de **análise de complexidade**. Roda direto nos arquivos do projeto e retorna **complexidade ciclomática** (por função e por arquivo), além de **LOC**. Usamos a **complexidade máxima** por arquivo como sinal de risco.
+* **gix (gitoxide)**
+  Biblioteca Git em Rust usada para percorrer commits, diffs e metadados com boa performance, oferecendo o `Repository` como hub de funcionalidades.
 
-* **Git** 
-  O projeto opera sobre um repositório Git local. 
+* **rust-code-analysis**
+  Biblioteca em Rust (baseada em **tree-sitter**) para **extrair métricas de manutenção** e **complexidade** em múltiplas linguagens. Usamos principalmente a **complexidade ciclomática por arquivo** como sinal.
 
-* **Typer**
-  Framework para **CLI em Python**. Permite construir uma interface `msr-hotspots analyze --repo . --since 2025-06-01 --top 15 --out report.md` com ajuda embutida e validação de parâmetros, mantendo o código enxuto.
+* **tokei** *(opcional)*
+  Para contar **LOC** (linhas de código, comentários, blanks) e enriquecer os relatórios — útil para contextualizar churn e complexidade em arquivos muito grandes/pequenos.
+
+* **clap**
+  Parser de linha de comando em Rust, rápido e com derive macros, para definirmos flags/subcomandos (`analyze`, `report`, etc.) de forma declarativa. 
 
