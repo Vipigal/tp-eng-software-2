@@ -43,3 +43,40 @@ pub fn analyze_multiple_files(
 
     complexity_map
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::io::Write;
+    use tempfile::TempDir;
+
+    #[test]
+    fn test_analyze_file_complexity_nonexistent() {
+        let path = Path::new("/nonexistent/file.rs");
+        let result = analyze_file_complexity(path).unwrap();
+        assert_eq!(result, 0.0);
+    }
+
+    #[test]
+    fn test_analyze_multiple_files_empty_list() {
+        let temp_dir = TempDir::new().unwrap();
+        let paths: Vec<PathBuf> = vec![];
+        let result = analyze_multiple_files(&paths, temp_dir.path());
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_analyze_multiple_files_with_existing_file() {
+        let temp_dir = TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("test.rs");
+
+        let mut file = fs::File::create(&file_path).unwrap();
+        writeln!(file, "fn main() {{}}").unwrap();
+
+        let paths = vec![file_path.clone()];
+        let result = analyze_multiple_files(&paths, temp_dir.path());
+
+        assert!(!result.is_empty());
+    }
+}

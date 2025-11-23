@@ -115,3 +115,67 @@ fn parse_date(date_str: Option<&str>) -> Result<Option<DateTime<Utc>>> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_git_metrics_new() {
+        let metrics = GitMetrics::new();
+        assert!(metrics.churn.is_empty());
+        assert!(metrics.authors.is_empty());
+    }
+
+    #[test]
+    fn test_git_metrics_add_change() {
+        let mut metrics = GitMetrics::new();
+        let path = PathBuf::from("src/main.rs");
+        metrics.add_change(path.clone(), 10, "Alice".to_string());
+
+        assert_eq!(*metrics.churn.get(&path).unwrap(), 10);
+        assert_eq!(metrics.authors.get(&path).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn test_git_metrics_add_multiple_changes_same_file() {
+        let mut metrics = GitMetrics::new();
+        let path = PathBuf::from("src/main.rs");
+
+        metrics.add_change(path.clone(), 10, "Alice".to_string());
+        metrics.add_change(path.clone(), 5, "Bob".to_string());
+
+        assert_eq!(*metrics.churn.get(&path).unwrap(), 15);
+        assert_eq!(metrics.authors.get(&path).unwrap().len(), 2);
+    }
+
+    #[test]
+    fn test_git_metrics_multiple_authors_same_file() {
+        let mut metrics = GitMetrics::new();
+        let path = PathBuf::from("src/main.rs");
+
+        metrics.add_change(path.clone(), 5, "Alice".to_string());
+        metrics.add_change(path.clone(), 3, "Bob".to_string());
+        metrics.add_change(path.clone(), 2, "Charlie".to_string());
+
+        assert_eq!(metrics.authors.get(&path).unwrap().len(), 3);
+    }
+
+    #[test]
+    fn test_parse_date_none() {
+        let result = parse_date(None).unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_parse_date_valid() {
+        let result = parse_date(Some("2024-01-15")).unwrap();
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn test_parse_date_invalid() {
+        let result = parse_date(Some("invalid-date"));
+        assert!(result.is_err());
+    }
+}

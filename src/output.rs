@@ -83,3 +83,98 @@ pub fn save_markdown(metrics: &[FileMetrics], path: &Path) -> Result<()> {
     file.write_all(content.as_bytes())?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+    use tempfile::TempDir;
+
+    fn create_test_metrics() -> Vec<FileMetrics> {
+        vec![
+            FileMetrics {
+                path: PathBuf::from("src/main.rs"),
+                churn: 100,
+                complexity: 50.5,
+                authors: 3,
+                score: 75.25,
+            },
+            FileMetrics {
+                path: PathBuf::from("src/lib.rs"),
+                churn: 50,
+                complexity: 25.3,
+                authors: 2,
+                score: 40.15,
+            },
+        ]
+    }
+
+    #[test]
+    fn test_table_row_from_file_metrics() {
+        let metrics = FileMetrics {
+            path: PathBuf::from("test.rs"),
+            churn: 100,
+            complexity: 50.5,
+            authors: 2,
+            score: 75.0,
+        };
+
+        let row = TableRow::from(&metrics);
+        assert_eq!(row.path, "test.rs");
+        assert_eq!(row.churn, 100);
+        assert_eq!(row.complexity, "50.50");
+        assert_eq!(row.authors, 2);
+        assert_eq!(row.score, "75.00");
+    }
+
+    #[test]
+    fn test_save_json() {
+        let temp_dir = TempDir::new().unwrap();
+        let json_path = temp_dir.path().join("output.json");
+
+        let metrics = create_test_metrics();
+        let result = save_json(&metrics, &json_path);
+
+        assert!(result.is_ok());
+        assert!(json_path.exists());
+
+        let content = std::fs::read_to_string(&json_path).unwrap();
+        assert!(content.contains("main.rs"));
+        assert!(content.contains("lib.rs"));
+    }
+
+    #[test]
+    fn test_save_csv() {
+        let temp_dir = TempDir::new().unwrap();
+        let csv_path = temp_dir.path().join("output.csv");
+
+        let metrics = create_test_metrics();
+        let result = save_csv(&metrics, &csv_path);
+
+        assert!(result.is_ok());
+        assert!(csv_path.exists());
+
+        let content = std::fs::read_to_string(&csv_path).unwrap();
+        assert!(content.contains("Arquivo"));
+        assert!(content.contains("main.rs"));
+        assert!(content.contains("lib.rs"));
+    }
+
+    #[test]
+    fn test_save_markdown() {
+        let temp_dir = TempDir::new().unwrap();
+        let md_path = temp_dir.path().join("output.md");
+
+        let metrics = create_test_metrics();
+        let result = save_markdown(&metrics, &md_path);
+
+        assert!(result.is_ok());
+        assert!(md_path.exists());
+
+        let content = std::fs::read_to_string(&md_path).unwrap();
+        assert!(content.contains("# Análise de Hotspots"));
+        assert!(content.contains("main.rs"));
+        assert!(content.contains("lib.rs"));
+        assert!(content.contains("|")); // Markdown table syntax
+    }
+}
