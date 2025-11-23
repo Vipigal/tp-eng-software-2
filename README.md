@@ -14,12 +14,12 @@ Destacar arquivos “hotspots” que tendem a gerar custo de manutenção por re
 
 1. **Coleta (Git)**
 
-   * Percorremos o histórico do repositório com uma lib Git em Rust para obter, por arquivo, **linhas adicionadas/removidas** (churn) e **autores** ao longo de um período (`--since/--until`). Usaremos o **gix (gitoxide)** como backbone Git em Rust, que fornece abstração de `Repository` com foco em performance. ([Docs.rs][1])
-   * (Talvez) Possamos aceitar uma URL e clonar/localizar branch/tag. A ideia é fazer com o git local.
+   * Percorremos o histórico do repositório com a biblioteca **git2** para obter, por arquivo, **linhas adicionadas/removidas** (churn) e **autores** ao longo de um período (`--since/--until`). A git2 é uma biblioteca Rust que fornece bindings para libgit2, oferecendo acesso completo às funcionalidades do Git com excelente performance.
+   * No momento, o projeto funciona apenas para git local.
 
 2. **Complexidade**
 
-   * Rodamos **rust-code-analysis** para extrair **métricas de manutenção** baseadas em **tree-sitter** (ex.: complexidade ciclomática por arquivo). É multilinguagem e projetado justamente para análise de código. ([mozilla.github.io][2])
+   * Utilizamos a biblioteca **tokei** para análise de código e métricas de complexidade em múltiplas linguagens. A tokei é uma ferramenta rápida em Rust para contar linhas de código e fornecer estatísticas sobre a base de código.
 
 3. **Cálculo do Score de Risco**
 
@@ -43,15 +43,125 @@ Destacar arquivos “hotspots” que tendem a gerar custo de manutenção por re
 
 * Linguagem: **Rust**
 
-* **gix (gitoxide)**
-  Biblioteca Git em Rust usada para percorrer commits, diffs e metadados com boa performance, oferecendo o `Repository` como hub de funcionalidades.
+* **git2**
+  Biblioteca Rust que fornece bindings para libgit2, usada para percorrer commits, diffs e metadados do repositório Git com alta performance. Oferece acesso completo à API do Git de forma segura e eficiente.
 
-* **rust-code-analysis**
-  Biblioteca em Rust (baseada em **tree-sitter**) para **extrair métricas de manutenção** e **complexidade** em múltiplas linguagens. Usamos principalmente a **complexidade ciclomática por arquivo** como sinal.
-
-* **tokei** *(opcional)*
-  Para contar **LOC** (linhas de código, comentários, blanks) e enriquecer os relatórios — útil para contextualizar churn e complexidade em arquivos muito grandes/pequenos.
+* **tokei**
+  Biblioteca rápida em Rust para contar linhas de código, comentários e análise de complexidade em múltiplas linguagens. Usada para obter métricas de manutenção e contextualizar o tamanho dos arquivos.
 
 * **clap**
-  Parser de linha de comando em Rust, rápido e com derive macros, para definirmos flags/subcomandos (`analyze`, `report`, etc.) de forma declarativa. 
+  Parser de linha de comando em Rust, rápido e com derive macros, para definir flags/subcomandos (`analyze`, `report`, etc.) de forma declarativa e type-safe.
+
+* **serde / serde_json / csv**
+  Bibliotecas para serialização e deserialização de dados. Usadas para exportar os relatórios em diferentes formatos (JSON, CSV).
+
+* **tabled**
+  Biblioteca para formatação de tabelas no terminal, usada para exibir os resultados do análise de forma legível e organizada.
+---
+
+## Como rodar o projeto
+
+### Pré-requisitos
+
+- **Rust** (versão 1.70 ou superior)
+  - Instale através do [rustup](https://rustup.rs/): `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
+- **Git** instalado no sistema
+
+### Compilação
+
+Para compilar o projeto em modo de desenvolvimento:
+
+```bash
+cargo build
+```
+
+Para compilar em modo de produção (otimizado):
+
+```bash
+cargo build --release
+```
+
+O binário será gerado em:
+- Desenvolvimento: `target/debug/hotspot-analyzer`
+- Produção: `target/release/hotspot-analyzer`
+
+### Execução
+
+Após compilar, você pode executar o analisador diretamente com:
+
+```bash
+cargo run -- [OPÇÕES]
+```
+
+Ou usando o binário compilado:
+
+```bash
+./target/debug/hotspot-analyzer [OPÇÕES]
+# ou
+./target/release/hotspot-analyzer [OPÇÕES]
+```
+
+**Exemplos de uso:**
+
+```bash
+# Analisar o repositório atual
+cargo run -- /caminho/do/repositorio
+
+# Analisar com filtro de período
+cargo run -- /caminho/do/repositorio --since "2024-01-01" --until "2024-12-31"
+
+# Exportar para JSON
+cargo run -- /caminho/do/repositorio --json --out report.json
+
+# Mostrar apenas os top 10 hotspots
+cargo run -- /caminho/do/repositorio --top 10
+```
+
+### Testes
+
+O projeto possui testes unitários para as principais funcionalidades.
+
+**Rodar todos os testes:**
+
+```bash
+cargo test
+```
+
+**Rodar testes com output detalhado:**
+
+```bash
+cargo test -- --nocapture
+```
+
+**Rodar testes de um módulo específico:**
+
+```bash
+cargo test score           # Testa o módulo score
+cargo test git_analyzer    # Testa o módulo git_analyzer
+cargo test complexity      # Testa o módulo complexity
+cargo test output          # Testa o módulo output
+```
+
+**Rodar um teste específico:**
+
+```bash
+cargo test test_calculate_scores_basic
+```
+
+**Verificar cobertura de testes:**
+
+Os testes cobrem as funcionalidades principais:
+- Cálculo de scores (`src/score.rs`)
+- Análise de repositório Git (`src/git_analyzer.rs`)
+- Análise de complexidade (`src/complexity.rs`)
+- Formatação de saída (`src/output.rs`)
+
+### CI/CD
+
+O projeto está configurado com GitHub Actions para executar os testes automaticamente a cada push. O workflow:
+1. Compila o projeto
+2. Executa todos os testes unitários
+3. Valida que o código está funcionando corretamente
+
+Você pode ver o status dos testes no badge do GitHub Actions no topo deste README.
 
